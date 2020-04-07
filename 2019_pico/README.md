@@ -1,2 +1,1 @@
-# CTFs
-various CTFs solutions
+# picoCTF 2019
