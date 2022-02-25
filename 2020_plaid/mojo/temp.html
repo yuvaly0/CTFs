@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+	<script src="/mojo_js_extracted/mojo/public/js/mojo_bindings.js"></script>
+	<script src="/mojo_js_extracted/third_party/blink/public/mojom/plaidstore/plaidstore.mojom.js"></script>
+
+	<script>
+		const plaid_store = new blink.mojom.PlaidStorePtr();
+		Mojo.bindInterface(blink.mojom.PlaidStore.name,
+       		mojo.makeRequest(plaid_store).handle, "context", true);
+	</script>
+
+	<script> 
+		const MESSAGES = 400;
+	</script>
+
+	<script>
+		plaid_store.storeData('asdf', [10]);
+
+		for(let i = 0; i < MESSAGES; i++) {
+			try {
+				const res = plaid_store.getData('asdf', 1)
+				.then((bla) => {
+					console.log('yuvaly0')
+				});
+			}
+			catch (e) {
+				console.log(e);
+			} 
+		}
+	</script>
+</html>

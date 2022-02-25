@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+	<script src="/mojo_js_extracted/mojo/public/js/mojo_bindings_lite.js"></script>
+	<script src="/mojo_js_extracted/third_party/blink/public/mojom/plaidstore/plaidstore.mojom-lite.js"></script>
+
+	<script> 
+		const MESSAGES = 400;
+		const REMOTE = blink.mojom.PlaidStore.getRemote(true);
+		console.log('child');
+	</script>
+
+	<script>
+		REMOTE.storeData('asdf', [10]);
+
+		for(let i = 0; i < MESSAGES; i++) {
+			try {
+				const res = REMOTE.getData('asdf', 1)
+				.then((bla) => {
+					console.log(bla);
+				console.log('yay');
+			});
+			}
+			catch (e) {
+				console.log(e);
+			} 
+		}
+	</script>
+</html>

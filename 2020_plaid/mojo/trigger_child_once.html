@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+	<script src="/mojo_js_extracted/mojo/public/js/mojo_bindings.js"></script>
+	<script src="/mojo_js_extracted/third_party/blink/public/mojom/plaidstore/plaidstore.mojom.js"></script>
+
+	<script>
+	</script>
+
+	<script>
+		function create_rfh(id) {
+			const iframe = document.createElement('iframe');
+			iframe.src = "#child";
+			iframe.id = id;
+
+			document.body.appendChild(iframe);
+		}
+
+		function delete_rfh(id) {
+			document.getElementById(id).remove();
+		}
+	</script>
+
+	<script>
+		async function getFreedPtr() {
+			// const interceptor = new MojoInterfaceInterceptor(blink.mojom.PlaidStore.name);
+			// interceptor.oninterfacerequest = (e) => {
+			// 	console.log(e);
+			// 	console.log('intercepted');
+			// }
+
+			// const frame = create_rfh('shmark');
+		
+			// interceptor.start();
+
+		}
+
+		/*
+		  let helperImpl = new TestHelperImpl;
+		  let interceptor =
+		      new MojoInterfaceInterceptor(content.mojom.MojoLayoutTestHelper.name);
+		  interceptor.oninterfacerequest = e => {
+		    helperImpl.bindRequest(e.handle);
+		  };
+		  interceptor.start();
+
+		  let helper = new content.mojom.MojoLayoutTestHelperPtr;
+		  Mojo.bindInterface(content.mojom.MojoLayoutTestHelper.name,
+                     mojo.makeRequest(helper).handle,
+                     "process");
+		*/
+
+		function trigger() {
+			const interceptor = new MojoInterfaceInterceptor(blink.mojom.PlaidStore.name, "process");
+
+			interceptor.oninterfacerequest = (e) => {
+				console.log(e);
+				console.log('intercepted');
+			}
+		
+			console.log('starting to intercept');
+			interceptor.start();
+
+			const plaid_store = new blink.mojom.PlaidStorePtr();
+
+			Mojo.bindInterface(
+				blink.mojom.PlaidStore.name, 
+				mojo.makeRequest(plaid_store).handle, 
+				"context", 
+				true
+			);
+
+			plaid_store.storeData('asdf', [10]);
+			plaid_store.getData('asdf', 2).then((a) => {
+				console.log(a.data);
+			});
+
+			console.log('done');
+		}
+	</script>
+	<body onload="trigger()">
+</html>

